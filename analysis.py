@@ -3,6 +3,8 @@ from uuid import uuid4
 
 import duckdb
 
+from visualisations import plot_inspect_samples_as_lasagne
+
 # inspect-evaldb --log_dir /home/ubuntu/los-alamos/logs --db_uri output.db --hide_manual
 con = duckdb.connect("gaia-t0.db")
 
@@ -29,23 +31,40 @@ try:
 except duckdb.duckdb.CatalogException:
     pass
 
-df = con.execute("""
-SELECT * 
-FROM tidy_eval_messages tem
-JOIN tidy_eval_sample_headers tesh ON tesh.raw_log_uuid = tem.raw_log_uuid
-JOIN tidy_eval_log_headers telh ON telh.raw_eval_log_header_uuid = tem.raw_log_uuid
-""").df()
-df["task_name"] = df["target"].apply(
-    lambda v: {"55": "trench", "6": "crocodiles", "CUB": "olympics"}[v]
+# df = con.execute("""
+# SELECT *
+# FROM tidy_eval_messages tem
+# JOIN tidy_eval_sample_headers tesh ON tesh.raw_sample_uuid = tem.raw_sample_uuid
+# JOIN tidy_eval_log_headers telh ON telh.raw_eval_log_header_uuid = tem.raw_log_uuid
+# """).df()
+# df["task_name"] = df["target"].apply(
+#     lambda v: {"55": "trench", "6": "crocodiles", "CUB": "olympics"}[v]
+# )
+
+
+# df.groupby(["model", "task_name"]).apply(lambda gdf: gdf.shape[0], include_groups=False)
+
+messages = df
+messages["tool_call"] = (
+    messages["function"].fillna("Not a tool call").astype(dtype="category")
 )
 
-df.groupby(["model", "task_name"]).apply(lambda gdf: gdf.shape[0], include_groups=False)
-
-df.loc[
-    (df["task_name"] == "olympics")
-    & (df["model"] == "anthropic/claude-3-opus-20240229")
-]
-
+plot_inspect_samples_as_lasagne(
+    messages,
+    title_suffix="",
+    sample_col="tidy_sample_uuid",
+    index_col="index",
+    score_col="tool_call",
+    grade_col="grade",
+    model_col="model",
+    models=[
+        "anthropic/claude-3-7-sonnet-20250219",
+        "anthropic/claude-3-5-sonnet-20240620",
+        "anthropic/claude-3-opus-20240229",
+    ],
+    score_type="ucat",
+    mode="save",
+)
 breakpoint()
 
 # Want to join the tidy messages and tidy headers
